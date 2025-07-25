@@ -6,16 +6,16 @@
 
 ## Fonctionnalités principales :
 
-### 🔍 Filtrage intelligent des terrains
+###  Filtrage intelligent des terrains
 - Recherche de terrains selon la **localisation**, la **superficie**, et la **durée de location**.
 - **Filtrage climatique** : Affiche uniquement les terrains compatibles avec les cultures envisagées selon le **climat local (température, pluviométrie, humidité)**.
 - **Analyse de rentabilité** : Estimation de la productivité selon la culture choisie et la région.
 
-### 🧠 Recommandations basées sur un modèle NLP (traitement du langage naturel)
+###  Recommandations basées sur un modèle NLP (traitement du langage naturel)
 - L’utilisateur peut décrire le type de terrain souhaité (ex : "terrain pour culture de tomate sous serre dans région humide") et le système propose automatiquement des terrains adaptés.
 - **Compréhension automatique** des besoins via NLP et suggestions instantanées.
 
-### 🌍 Carte interactive
+###  Carte interactive
 - Visualisation de tous les terrains sur une carte avec **indicateurs climatiques**.
 - Accès aux détails du terrain (sol, accès à l’eau, climat, prix, disponibilité).
 
@@ -26,7 +26,7 @@
 ### 1. Recherche et filtrage intelligent des terrains
 <img src="images/c.png" alt="Recherche intelligente" width="400"/>
 
-### 2. Contacte 
+### 2. Contact
 <img src="images/b.png" alt="Carte interactive" width="400"/>
 
 ### 3. afficher les terrains
