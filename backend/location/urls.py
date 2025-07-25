@@ -1,5 +1,5 @@
 """
-URL configuration for chatbot project.
+URL configuration for location project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/5.1/topics/http/urls/
@@ -16,18 +16,19 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from django.urls import path
-from .views import plantid_api, ask_api_router
-
-
-from .views import ask_api_text,receive_password,check_session
-
-
+from .views import insert_poste, get_all_postes,search_location,delete_post,update_post,get_alll_postes
 urlpatterns = [
     path('admin/', admin.site.urls),
-          path('api/plantid/', plantid_api, name='plantid_api'),
-           path('api/ask/', ask_api_router, name='ask_api_router'),
-            path('receive-password/', receive_password, name='receive-password'),
-            path('ask_audio/', ask_api_text, name='ask_api_text'),
-         path("check/", check_session, name="check_session"), 
+        path('postes/', insert_poste, name='insert-poste'),
+        path('a/', get_all_postes, name='get-all-postes'),
+        path('search_location/', search_location, name='search-location'),
+          path('delete_post/<int:post_id>/', delete_post, name='delete_post'),
+           path("update_post/<int:post_id>/", update_post, name="update_post"),
+            path('b/', get_alll_postes, name='get-alll-postes'),
+            
+           
 ]
+
+
+
+

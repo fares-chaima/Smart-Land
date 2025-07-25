@@ -1,0 +1,357 @@
+import pymysql
+from django.http import JsonResponse
+from pymongo import MongoClient
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET
+import json
+import spacy
+
+nlp = spacy.load("fr_core_news_sm")
+
+CULTURES = {
+   "banane": ["Blida", "Tipaza", "Béjaïa", "Alger", "Chlef"],
+    "olives": ["Tizi Ouzou", "Béjaïa", "Sétif", "Bouira", "Médéa", "Mascara", "Jijel"],
+    "blé": ["Sétif", "Constantine", "Guelma", "Tiaret", "Mascara", "Aïn Defla", "Relizane"],
+    "raisins": ["Aïn Defla", "Mascara", "Tlemcen", "Mila", "Relizane", "Blida", "Tipaza"],
+    "tomates": ["Mostaganem", "Aïn Defla", "Chlef", "Oran", "Biskra", "El Oued", "Relizane"],
+    "oranges": ["Blida", "Mascara", "Tipaza", "Jijel", "Skikda", "Mostaganem", "Aïn Defla"],
+    "pomme de terre": ["Aïn Defla", "Bouira", "Sétif", "El Oued", "Médéa", "Mascara", "Tlemcen"],
+    "dattes": ["Biskra", "Ouargla", "El Oued", "Ghardaïa", "Adrar", "Touggourt", "Timimoun"],
+    "pastèque": ["Biskra", "El Oued", "Ouargla", "Laghouat", "Tébessa", "Djelfa"],
+    "oignons": ["Aïn Defla", "Mostaganem", "El Oued", "Biskra", "Relizane", "Tlemcen"],
+    "ail": ["Médéa", "Biskra", "El Oued", "Sétif", "Batna"],
+    "carottes": ["Aïn Defla", "Mostaganem", "Relizane", "Biskra", "Médéa"],
+    "courgettes": ["Biskra", "El Oued", "Relizane", "Mostaganem", "Tipaza"],
+    "fraises": ["Jijel", "Tipaza", "Blida", "Mostaganem", "Skikda"],
+    "figues": ["Béjaïa", "Tizi Ouzou", "Jijel", "Sétif", "Boumerdès"],
+    "lentilles": ["Tiaret", "Sétif", "Djelfa", "M'sila", "Laghouat"],
+    "pois chiches": ["Tiaret", "Sétif", "Djelfa", "M’sila", "Batna"],
+    "melon": ["Biskra", "El Oued", "Ouargla", "Tébessa", "Tlemcen"],
+    "betterave sucrière": ["Mostaganem", "Relizane", "Mascara", "Sidi Bel Abbès"],
+    "coton": ["Ouargla", "Biskra", "Ghardaïa", "Timimoun"],
+    "cacahuètes": ["Aïn Defla", "Biskra", "El Oued", "Mostaganem"],
+    "soja": ["Tiaret", "Sétif", "Relizane", "Mascara"],
+    "sorgho": ["Tiaret", "Djelfa", "M’sila", "Laghouat"],
+    "orge": ["Tiaret", "Sétif", "Guelma", "Constantine", "Djelfa"],
+    "avocat": ["Tipaza", "Blida", "Mascara", "Tlemcen"],
+    "mangue": ["Tipaza", "Blida", "Mostaganem"],
+    "kiwi": ["Blida", "Tipaza", "Mostaganem"],
+    "papaye": ["Biskra", "Ouargla", "El Oued"],
+    "pistache": ["Béjaïa", "Tizi Ouzou", "Batna"],
+    "pêche": ["Blida", "Tizi Ouzou", "Médéa", "Jijel"],
+    "abricot": ["Blida", "Médéa", "Mascara", "Tlemcen"],
+    "cerise": ["Tizi Ouzou", "Béjaïa", "Sétif"],
+    "coing": ["Blida", "Tizi Ouzou", "Médéa"],
+    "prune": ["Béjaïa", "Tizi Ouzou", "Sétif", "Jijel"],
+    "poire": ["Blida", "Médéa", "Tipaza"],
+    "pomme": ["Blida", "Médéa", "Sétif", "Batna"],
+    "grenade": ["Batna", "Biskra", "Tébessa", "Ouargla"],
+    "noix": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "amande": ["Tizi Ouzou", "Béjaïa", "Batna"],
+    "noisette": ["Tizi Ouzou", "Béjaïa"],
+    "poivron": ["Biskra", "El Oued", "Mostaganem"],
+    "choux": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "navet": ["Médéa", "Mostaganem", "Relizane"],
+    "petit pois": ["Mostaganem", "Aïn Defla", "Relizane"],
+    "laitue": ["Mostaganem", "Relizane", "Tlemcen"],
+    "épinard": ["Mostaganem", "Aïn Defla", "Relizane"],
+    "persil": ["Mostaganem", "Blida", "Aïn Defla"],
+    "coriandre": ["Mostaganem", "Relizane", "Mascara"],
+    "basilic": ["Blida", "Tipaza", "Mostaganem"],
+    "menthe": ["Blida", "Tipaza", "Mostaganem"],
+    "thym": ["Blida", "Tizi Ouzou", "Jijel"],
+    "romarin": ["Blida", "Médéa", "Tizi Ouzou"],
+    "safran": ["Béjaïa", "Batna", "Tizi Ouzou"],
+    "gingembre": ["Biskra", "Ouargla", "El Oued"],
+    "curcuma": ["Biskra", "Ouargla", "El Oued"],
+    "vanille": ["Tipaza", "Blida", "Mostaganem"],
+    "café": ["Tipaza", "Blida"],
+    "thé": ["Tizi Ouzou", "Béjaïa"],
+    "tabac": ["Mostaganem", "Relizane", "Tlemcen"],
+    "colza": ["Tiaret", "Sétif", "Relizane"],
+    "tournesol": ["Tiaret", "Sétif", "Mascara"],
+    "sésame": ["Biskra", "El Oued", "Ouargla"],
+    "chanvre": ["Tizi Ouzou", "Béjaïa"],
+    "ananas": ["Tipaza", "Blida", "Mostaganem"],
+    "goyave": ["Tipaza", "Blida", "Mostaganem"],
+    "cassis": ["Tizi Ouzou", "Béjaïa", "Sétif"],
+    "mûre": ["Tizi Ouzou", "Béjaïa", "Sétif"],
+    "datte Medjool": ["Biskra", "Ouargla", "El Oued"],
+    "tamarin": ["Biskra", "Ouargla", "El Oued"],
+    "bois de santal": ["Ouargla", "Biskra", "El Oued"],
+    "pin d'Alep": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "eucalyptus": ["Blida", "Tipaza", "Mostaganem"],
+    "palmier nain": ["Biskra", "Ouargla", "El Oued"],
+     "kiwano": ["Biskra", "El Oued", "Ouargla"],
+    "fruit du dragon": ["Biskra", "Ouargla", "El Oued"],
+    "châtaigne": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "maca": ["Biskra", "Ouargla", "Timimoun"],
+    "noix de coco": ["Blida", "Tipaza", "Mostaganem"],
+    "néflier": ["Blida", "Médéa", "Tizi Ouzou"],
+    "nashi": ["Blida", "Tipaza", "Médéa"],
+    "pamplemousse": ["Blida", "Tipaza", "Mostaganem"],
+    "kaki": ["Blida", "Médéa", "Tipaza"],
+    "baobab": ["Ouargla", "Biskra", "El Oued"],
+    "sureau": ["Tizi Ouzou", "Béjaïa", "Sétif"],
+    "cassis": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "aloe vera": ["Biskra", "Ouargla", "El Oued"],
+    "ginseng": ["Biskra", "Ouargla", "Timimoun"],
+    "fenouil": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "aneth": ["Mostaganem", "Aïn Defla", "Relizane"],
+    "estragon": ["Blida", "Tipaza", "Mostaganem"],
+    "laurier": ["Blida", "Médéa", "Tizi Ouzou"],
+    "myrtille": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "cerfeuil": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "camomille": ["Blida", "Tizi Ouzou", "Jijel"],
+    "mélisse": ["Blida", "Tizi Ouzou", "Jijel"],
+    "valériane": ["Blida", "Médéa", "Tizi Ouzou"],
+    "coquelicot": ["Blida", "Médéa", "Tizi Ouzou"],
+    "reine-des-prés": ["Blida", "Médéa", "Tizi Ouzou"],
+    "angélique": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "sauge": ["Blida", "Tipaza", "Mostaganem"],
+    "sarriette": ["Blida", "Tipaza", "Mostaganem"],
+    "hyssope": ["Blida", "Tipaza", "Mostaganem"],
+    "verveine": ["Blida", "Tipaza", "Mostaganem"],
+    "arnica": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "gentiane": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "hibiscus": ["Biskra", "Ouargla", "El Oued"],
+    "moringa": ["Biskra", "Ouargla", "El Oued"],
+    "roquette": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "ciboulette": ["Mostaganem", "Aïn Defla", "Relizane"],
+    "céleri": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "bettes": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "topinambour": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "igname": ["Biskra", "El Oued", "Ouargla"],
+    "manioc": ["Biskra", "El Oued", "Ouargla"],
+    "fonio": ["Tiaret", "Djelfa", "M’sila"],
+    "quinoa": ["Tiaret", "Djelfa", "M’sila"],
+    "millet": ["Tiaret", "Djelfa", "M’sila"],
+    "orge perlé": ["Tiaret", "Djelfa", "M’sila"],
+    "azuki": ["Tiaret", "Sétif", "M’sila"],
+    "lupin": ["Tiaret", "Sétif", "Relizane"],
+    "vigne vierge": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "cresson": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "bambou": ["Biskra", "Ouargla", "El Oued"],
+    "litchi": ["Blida", "Tipaza", "Mostaganem"],
+    "canne à sucre": ["Biskra", "El Oued", "Ouargla"],
+    "cacao": ["Tipaza", "Blida", "Mostaganem"],
+    "safou": ["Biskra", "Ouargla", "El Oued"],
+    "pandanus": ["Biskra", "Ouargla", "El Oued"],
+    "vétiver": ["Biskra", "Ouargla", "El Oued"],
+    "kava": ["Biskra", "Ouargla", "El Oued"],
+    "kumquat": ["Blida", "Tipaza", "Mostaganem"],
+    "longane": ["Blida", "Tipaza", "Mostaganem"],
+    "durian": ["Biskra", "Ouargla", "El Oued"],
+    "salicorne": ["Mostaganem", "Relizane", "Aïn Defla"],
+       "caroube": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "figue de barbarie": ["Biskra", "Ouargla", "El Oued"],
+    "cumin": ["Tiaret", "Djelfa", "M’sila"],
+    "sésame": ["Biskra", "Ouargla", "El Oued"],
+    "poivron": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "pistache": ["Biskra", "Ouargla", "Timimoun"],
+    "goyave": ["Blida", "Tipaza", "Mostaganem"],
+    "zucchini": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "papaye": ["Biskra", "El Oued", "Ouargla"],
+    "ananas": ["Biskra", "Ouargla", "El Oued"],
+    "choux de Bruxelles": ["Blida", "Tipaza", "Mostaganem"],
+    "navet": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "prune": ["Blida", "Médéa", "Tizi Ouzou"],
+    "cassis": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "abricot": ["Blida", "Médéa", "Tizi Ouzou"],
+    "mûre": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "pavot": ["Blida", "Médéa", "Tizi Ouzou"],
+    "noix": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "persil": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "pissenlit": ["Blida", "Médéa", "Tizi Ouzou"],
+    "échalote": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "cresson": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "radis": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "chou-fleur": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "coriandre": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "baies d’argousier": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "panais": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "melon d'eau": ["Biskra", "Ouargla", "El Oued"],
+    "cerise": ["Blida", "Médéa", "Tizi Ouzou"],
+    "framboise": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "groseille": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "poireau": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "basilic": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "origan": ["Blida", "Médéa", "Tizi Ouzou"],
+    "marjolaine": ["Blida", "Médéa", "Tizi Ouzou"],
+    "fève": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "cacao": ["Tipaza", "Blida", "Mostaganem"],
+    "piment": ["Mostaganem", "Relizane", "Aïn Defla"],
+    "maïs": ["Sétif", "Constantine", "Guelma"],
+    "coton": ["Biskra", "Ouargla", "El Oued"],
+    "soja": ["Tiaret", "Djelfa", "M’sila"],
+    "patate douce": ["Biskra", "Ouargla", "El Oued"],
+    "noisette": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "pruneau": ["Blida", "Médéa", "Tizi Ouzou"],
+    "melon": ["Biskra", "Ouargla", "El Oued"],
+    "grenade": ["Blida", "Tipaza", "Mostaganem"],
+    "safran": ["Tizi Ouzou", "Béjaïa", "Jijel"],
+    "chanvre": ["Biskra", "Ouargla", "El Oued"]
+}
+CLIMATS = {
+    "méditerranéen": [
+        "Alger", "Oran", "Béjaïa", "Tizi Ouzou", "Jijel", "Skikda", "Mostaganem", "Tipaza", "Annaba", "El Tarf",
+        "Chlef", "Boumerdès", "Blida", "Relizane", "Aïn Témouchent", "Tlemcen", "Ghazaouet", "Collo", "Tenes", "Dellys",
+        "Beni Haoua", "El Kala", "Gouraya", "Cherchell", "Port Gueydon", "Sidi Lakhdar", "El Marsa", "Bouharoun", "Tigzirt", "Zemmouri"
+    ],
+    "continental": [
+        "Sétif", "Batna", "Djelfa", "Tiaret", "Msila", "Bordj Bou Arreridj", "Médéa", "Laghouat", "Souk Ahras", "Guelma",
+        "Oum El Bouaghi", "Tébessa", "Aflou", "Tissemsilt", "Ksar El Boukhari", "Mecheria", "Saïda", "Khenchela", "Aïn Oussera", "Magra",
+        "Tazoult", "Boussaâda", "Meskiana", "M’Chedallah", "Bir Ghbalou", "Aïn Fakroun", "El Eulma", "Ras El Oued", "Bougaa", "Lakhdaria"
+    ],
+    "semi-aride": [
+        "Médéa", "Tiaret", "Saïda", "Laghouat", "Djelfa", "Msila", "Naâma", "El Bayadh", "Aïn Sefra", "Bordj Badji Mokhtar",
+        "Mekhadma", "Hassi R'mel", "Tébessa", "Sougueur", "Ouled Djellal", "Boussaâda", "Mouzaïa", "Birkhadem", "Bou Ismaïl", "Sour El Ghozlane",
+        "Ksar El Boukhari", "Mansoura", "Frenda", "Ksar Chellala", "Aïn El Hadjel", "Rouissat", "Aïn Beida", "Aïn Touta", "Sebdou", "Tindouf"
+    ],
+    "saharien": [
+        "Ouargla", "Tamanrasset", "Adrar", "Ghardaïa", "El Oued", "Illizi", "Béchar", "Tindouf", "Bordj Badji Mokhtar", "Timimoun",
+        "Touggourt", "Reggane", "In Salah", "In Amenas", "Djanet", "El Menia", "Beni Abbès", "Aoulef", "Tamalous", "Metlili",
+        "Megarine", "Temacine", "Tébessa Sud", "Zaouiat Kounta", "El Goléa", "Taougrit", "Tabelbala", "Tinerkouk", "Hassi Messaoud", "Béni Abbès"
+    ],
+    "montagnard": [
+        "Tikjda", "Aït Bouadou", "Boghni", "M'chedallah", "Chemini", "Ifigha", "Larbaâ Nath Irathen", "Tazmalt", "El Milia", "Tichy",
+        "Boudjima", "Bouzeguène", "Maâtkas", "Aokas", "Timezrit", "Chréa", "Theniet El Had", "El Ouricia", "Tachouda", "Ksar Boukhari",
+        "Babors", "Akbou", "Kherrata", "Mechtras", "Bechloul", "Seddouk", "Ouadhias", "Bouandas", "Azazga", "Freha", "Boudjellil"
+    ],
+    "oasis": [
+        "El Goléa", "Timimoun", "Touggourt", "Béni Abbès", "Djanet", "Ghardaïa", "Ouled Djellal", "El Oued", "Megarine", "Zaouiat Kounta",
+        "Metlili", "Temacine", "El M'Ghair", "Reggane", "In Salah", "In Amenas", "Aïn Salah", "Aïn Sefra", "Kerzaz", "Sidi Khaled",
+        "Hassi Messaoud", "Tindouf", "Ouargla", "Bordj Omar Driss", "Hassi Gara", "Tabelbala", "Taghit", "Taougrit", "El Menia", "Tinerkouk"
+    ]
+}
+
+# Connexion MongoDB
+client = MongoClient("mongodb://localhost:27017")
+db = client["location"]
+collection = db["postes"]
+
+# Pour garantir un identifiant unique auto-incrémenté, on utilise un champ "post_id"
+# Si tu n'as pas ce champ dans ta base, il faudra en ajouter un ou utiliser _id de MongoDB
+
+@csrf_exempt
+def insert_poste(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            location = data.get("location", "").strip()
+            description = data.get("description", "").strip()
+            area = data.get("area")
+            prix = data.get("prix")
+            contact = data.get("contact", "").strip()
+            titre = data.get("titre", "").strip()
+
+            if not location or not description or area is None or prix is None or not contact or not titre:
+                return JsonResponse({"error": "Tous les champs doivent être remplis."}, status=400)
+
+            if not location.endswith(", Algérie"):
+                location += ", Algérie"
+
+            # Générer un post_id auto-incrémenté simple (pas optimal pour production)
+            last_post = collection.find_one(sort=[("post_id", -1)])
+            post_id = last_post["post_id"] + 1 if last_post else 1
+
+            post_data = {
+                "post_id": post_id,
+                "location": location,
+                "description": description,
+                "area": area,
+                "prix": prix,
+                "contact": contact,
+                "titre": titre
+            }
+            collection.insert_one(post_data)
+
+            return JsonResponse({"message": "Poste ajouté avec succès", "location": location, "contact": contact, "titre": titre}, status=201)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Méthode non autorisée"}, status=405)
+
+
+@csrf_exempt
+def get_all_postes(request):
+    try:
+        result = list(collection.find({}, {"_id": 0}))
+        return JsonResponse(result, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+def delete_post(request, post_id):
+    if request.method == "DELETE":
+        try:
+            result = collection.delete_one({"post_id": int(post_id)})
+            if result.deleted_count == 0:
+                return JsonResponse({"error": "Aucun poste trouvé"}, status=404)
+            return JsonResponse({"message": "Poste supprimé avec succès"}, status=200)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+    return JsonResponse({"error": "Méthode non autorisée"}, status=405)
+
+
+@csrf_exempt
+def update_post(request, post_id):
+    if request.method == "PUT":
+        try:
+            data = json.loads(request.body)
+            updates = {}
+
+            for field in ["titre", "description", "location", "area", "prix", "contact"]:
+                if field in data:
+                    updates[field] = data[field]
+
+            if not updates:
+                return JsonResponse({"error": "Aucune donnée fournie pour la mise à jour"}, status=400)
+
+            result = collection.update_one({"post_id": int(post_id)}, {"$set": updates})
+            if result.matched_count == 0:
+                return JsonResponse({"error": "Aucun poste trouvé"}, status=404)
+
+            return JsonResponse({"message": "Poste mis à jour avec succès"}, status=200)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+    return JsonResponse({"error": "Méthode non autorisée"}, status=405)
+
+
+@csrf_exempt
+def receive_password(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            password = data.get("password")
+            if password:
+                request.session["user_password"] = password
+                request.session.set_expiry(86400)  # expire en 1 jour
+                return JsonResponse({"status": "success", "message": "Session démarrée"}, status=200)
+            else:
+                return JsonResponse({"status": "error", "message": "Mot de passe manquant"}, status=400)
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+    return JsonResponse({"status": "error", "message": "Méthode non autorisée"}, status=405)
+
+
+@require_GET
+def search_location(request):
+    query = request.GET.get("query", "").strip()
+    if not query:
+        return JsonResponse({"error": "Paramètre 'query' requis."}, status=400)
+
+    try:
+        # Recherche insensible à la casse dans description et titre
+        results = list(collection.find(
+            {"$or": [
+                {"description": {"$regex": query, "$options": "i"}},
+                {"titre": {"$regex": query, "$options": "i"}}
+            ]},
+            {"_id": 0}
+        ))
+        return JsonResponse(results, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
